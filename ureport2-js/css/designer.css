@@ -1,3 +1,12 @@
+.handsontable tr{
+    background: transparent;
+}
+.handsontable td, .handsontable th{
+    background: transparent;
+}
+.handsontable table.htCore{
+    border-collapse:collapse
+}
 .ud-toolbar{
     width: 100%;
     background: #f8f8f8;

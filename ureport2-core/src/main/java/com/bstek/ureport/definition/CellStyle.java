@@ -18,7 +18,10 @@ package com.bstek.ureport.definition;
 import java.awt.Font;
 import java.io.Serializable;
 
+import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
+
+import com.bstek.ureport.export.pdf.font.FontBuilder;
 
 
 /**
@@ -28,10 +31,11 @@ import org.codehaus.jackson.annotate.JsonIgnore;
 public class CellStyle implements Serializable{
 	private static final long serialVersionUID = 8327688051735343849L;
 	private String bgcolor;
-	private String forecolor="0,0,0";
-	private int fontSize=10;
-	private String fontFamily="宋体";
+	private String forecolor;
+	private int fontSize;
+	private String fontFamily;
 	private String format;
+	private float lineHeight;
 	private Alignment align;
 	private Alignment valign;
 	private Boolean bold;
@@ -169,6 +173,14 @@ public class CellStyle implements Serializable{
 		this.font = font;
 	}
 
+	public float getLineHeight() {
+		return lineHeight;
+	}
+
+	public void setLineHeight(float lineHeight) {
+		this.lineHeight = lineHeight;
+	}
+
 	@JsonIgnore
 	public Font getFont(){
 		if(this.font==null){
@@ -180,7 +192,11 @@ public class CellStyle implements Serializable{
 			}else if(italic!=null && italic){
 				fontStyle=Font.ITALIC;							
 			}
-			this.font=new Font(fontFamily,fontStyle,fontSize);
+			String fontName=fontFamily;
+			if(StringUtils.isBlank(fontName)){
+				fontName="宋体";
+			}
+			this.font=FontBuilder.getAwtFont(fontName, fontStyle, new Float(fontSize));
 		}
 		return this.font;
 	}

@@ -22,6 +22,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.dom4j.Element;
 
 import com.bstek.ureport.definition.Order;
+import com.bstek.ureport.definition.mapping.MappingItem;
+import com.bstek.ureport.definition.mapping.MappingType;
 import com.bstek.ureport.definition.value.AggregateType;
 import com.bstek.ureport.definition.value.DatasetValue;
 import com.bstek.ureport.definition.value.GroupItem;
@@ -47,10 +49,18 @@ public class DatasetValueParser extends ValueParser {
 		if(StringUtils.isNotBlank(order)){
 			value.setOrder(Order.valueOf(order));
 		}
+		String mappingType=element.attributeValue("mapping-type");
+		if(StringUtils.isNotBlank(mappingType)){
+			value.setMappingType(MappingType.valueOf(mappingType));
+		}
+		value.setMappingDataset(element.attributeValue("mapping-dataset"));
+		value.setMappingKeyProperty(element.attributeValue("mapping-key-property"));
+		value.setMappingValueProperty(element.attributeValue("mapping-value-property"));
 		List<GroupItem> groupItems=null;
 		List<MappingItem> mappingItems=null;
 		List<Condition> conditions=new ArrayList<Condition>();
 		PropertyExpressionCondition topCondition=null;
+		PropertyExpressionCondition prevCondition=null;
 		value.setConditions(conditions);
 		for(Object obj:element.elements()){
 			if(obj==null || !(obj instanceof Element)){
@@ -62,9 +72,11 @@ public class DatasetValueParser extends ValueParser {
 				conditions.add(condition);
 				if(topCondition==null){
 					topCondition=condition;
+					prevCondition=topCondition;
 				}else{
-					topCondition.setNextCondition(condition);
-					topCondition.setJoin(condition.getJoin());
+					prevCondition.setNextCondition(condition);
+					prevCondition.setJoin(condition.getJoin());
+					prevCondition=condition;
 				}				
 			}else if(ele.getName().equals("group-item")){
 				if(groupItems==null){
@@ -114,7 +126,9 @@ public class DatasetValueParser extends ValueParser {
 		String property=ele.attributeValue("property");
 		condition.setLeftProperty(property);
 		condition.setLeft(property);
-		condition.setOp(Op.parse(ele.attributeValue("op")));
+		String operation=ele.attributeValue("op");
+		condition.setOperation(operation);
+		condition.setOp(Op.parse(operation));
 		for(Object o:ele.elements()){
 			if(o==null || !(o instanceof Element)){
 				continue;

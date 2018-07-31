@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
@@ -35,6 +34,7 @@ import com.bstek.ureport.build.cell.down.DownExpandBuilder;
 import com.bstek.ureport.build.cell.right.RightExpandBuilder;
 import com.bstek.ureport.build.paging.BasePagination;
 import com.bstek.ureport.build.paging.Page;
+import com.bstek.ureport.build.paging.PagingBuilder;
 import com.bstek.ureport.definition.Band;
 import com.bstek.ureport.definition.Expand;
 import com.bstek.ureport.definition.Orientation;
@@ -60,7 +60,6 @@ import com.bstek.ureport.model.Row;
  */
 public class ReportBuilder extends BasePagination implements ApplicationContextAware{
 	public static final String BEAN_ID="ureport.reportBuilder";
-	private static final Logger log=Logger.getGlobal();
 	private ApplicationContext applicationContext;
 	private Map<String,DatasourceProvider> datasourceProviderMap=new HashMap<String,DatasourceProvider>();
 	private Map<Expand,CellBuilder> cellBuildersMap=new HashMap<Expand,CellBuilder>();
@@ -85,7 +84,8 @@ public class ReportBuilder extends BasePagination implements ApplicationContextA
 		doFillBlankRows(report,context);
 		recomputeCells(report,context);
 		long end=System.currentTimeMillis();
-		log.info("Report compute completed:"+(end-start)+"ms");
+		String msg="~~~ Report compute completed:"+(end-start)+"ms";
+		Utils.logToConsole(msg);
 		return report;
 	}
 	
@@ -227,6 +227,9 @@ public class ReportBuilder extends BasePagination implements ApplicationContextA
 				for(int i=start;i>-1;i--){
 					Row currentRow=rows.get(i);
 					Map<Column, Cell> prevColMap=rowMap.get(currentRow);
+					if(prevColMap==null){
+						continue;
+					}
 					if(prevColMap.containsKey(column)){
 						currentCell=prevColMap.get(column);
 						break;
@@ -241,10 +244,15 @@ public class ReportBuilder extends BasePagination implements ApplicationContextA
 				colSpan--;
 				index+=colSpan;
 			}
-			Cell newCell=newBlankCell(currentCell, column, report);
-			newCell.setRow(newRow);
-			newRow.getCells().add(newCell);
-			newCellMap.put(newCell.getColumn(), newCell);
+			int rowSpan=currentCell.getRowSpan();
+			if(rowSpan>1){
+				currentCell.setRowSpan(rowSpan+1);
+			}else{
+				Cell newCell=newBlankCell(currentCell, column, report);
+				newCell.setRow(newRow);
+				newRow.getCells().add(newCell);
+				newCellMap.put(newCell.getColumn(), newCell);
+			}
 		}
 		return newRow;
 	}
@@ -318,9 +326,9 @@ public class ReportBuilder extends BasePagination implements ApplicationContextA
 		pageRepeatHeaders.addAll(headerRows);
 		pageRepeatFooters.addAll(footerRows);
 		if(pagingMode.equals(PagingMode.fitpage)){
-			int height=paper.getHeight()-paper.getBottomMargin()-paper.getTopMargin();
+			int height=paper.getHeight()-paper.getBottomMargin()-paper.getTopMargin()-5;
 			if(paper.getOrientation().equals(Orientation.landscape)){
-				height=paper.getWidth()-paper.getBottomMargin()-paper.getTopMargin();
+				height=paper.getWidth()-paper.getBottomMargin()-paper.getTopMargin()-5;
 			}
 			int repeatHeaderRowHeight=report.getRepeatHeaderRowHeight(),repeatFooterRowHeight=report.getRepeatFooterRowHeight();
 			int titleRowHeight=report.getTitleRowsHeight();
@@ -358,8 +366,9 @@ public class ReportBuilder extends BasePagination implements ApplicationContextA
 					} 
 					continue;
 				}
-				rowHeight+=rowRealHeight;
+				rowHeight+=rowRealHeight+1;
 				pageRows.add(row);
+				row.setPageIndex(pageIndex);
 				boolean overflow=false;
 				if((i+1)<rows.size()){
 					Row nextRow=rows.get(i+1);
@@ -382,6 +391,7 @@ public class ReportBuilder extends BasePagination implements ApplicationContextA
 				Page newPage=buildPage(pageRows,pageRepeatHeaders,pageRepeatFooters,titleRows,pageIndex,report);
 				pages.add(newPage);
 			}
+			report.getContext().setTotalPages(pages.size());
 			buildPageHeaderFooter(pages, report);
 		}else{
 			int fixRows=paper.getFixRows()-headerRows.size()-footerRows.size();
@@ -419,13 +429,11 @@ public class ReportBuilder extends BasePagination implements ApplicationContextA
 						pageRepeatFooters.remove(index);
 						pageRepeatFooters.add(index,row);
 					}
-					if(index==-1){
-						throw new ReportComputeException("Invalid row["+band+"] with key "+rowKey+".");
-					}
 					continue;
 				}
+				row.setPageIndex(pageIndex);
 				pageRows.add(row);
-				if((pageRows.size()+footerRows.size()) >= fixRows){
+				if(pageRows.size() >= fixRows){
 					Page newPage=buildPage(pageRows,pageRepeatHeaders,pageRepeatFooters,titleRows,pageIndex,report);
 					pageIndex++;
 					pages.add(newPage);
@@ -436,9 +444,11 @@ public class ReportBuilder extends BasePagination implements ApplicationContextA
 				Page newPage=buildPage(pageRows,pageRepeatHeaders,pageRepeatFooters,titleRows,pageIndex,report);
 				pages.add(newPage);
 			}
+			report.getContext().setTotalPages(pages.size());
 			buildPageHeaderFooter(pages, report);
 		}
 		buildSummaryRows(summaryRows, pages);
+		PagingBuilder.computeExistPageFunctionCells(report);
 		report.setPages(pages);
 	}
 	

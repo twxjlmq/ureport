@@ -20,39 +20,40 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import com.bstek.ureport.model.Report;
-
 /**
  * @author Jacky.gao
- * @since 2017年8月19日
+ * @since 2017年9月6日
  */
-public class ReportMapObject {
+public class ObjectMap {
 	private final int MAX_ITEM=3;
-	private static final int MILLISECOND=1200000;//default expired time is 20 minutes.
-	private Map<String, Report> reportMap=new LinkedHashMap<String, Report>();
+	private static final int MILLISECOND=300000;//default expired time is 5 minutes.
+	private Map<String, Object> map=new LinkedHashMap<String, Object>();
 	private long start;
-	public ReportMapObject() {
+	public ObjectMap() {
 		this.start=System.currentTimeMillis();
 	}
-	public void put(String file,Report report){
+	public void put(String key,Object obj){
 		this.start=System.currentTimeMillis();
-		if(reportMap.containsKey(file)){
-			reportMap.remove(file);
+		if(map.containsKey(key)){
+			map.remove(key);
 		}else{
-			if(reportMap.size()>MAX_ITEM){
+			if(map.size()>MAX_ITEM){
 				String lastFile=null;
-				for(Iterator<Entry<String,Report>> it=reportMap.entrySet().iterator();it.hasNext();){
-					Entry<String,Report> entry=it.next();
+				for(Iterator<Entry<String,Object>> it=map.entrySet().iterator();it.hasNext();){
+					Entry<String,Object> entry=it.next();
 					lastFile=entry.getKey();
 				}
-				reportMap.remove(lastFile);
+				map.remove(lastFile);
 			}
 		}
-		this.reportMap.put(file, report);
+		map.put(key, obj);
 	}
-	public Report getReport(String file){
+	public Object get(String key){
 		this.start=System.currentTimeMillis();
-		return this.reportMap.get(file);
+		return this.map.get(key);
+	}
+	public void remove(String key){
+		this.map.remove(key);
 	}
 	public boolean isExpired(){
 		long end=System.currentTimeMillis();

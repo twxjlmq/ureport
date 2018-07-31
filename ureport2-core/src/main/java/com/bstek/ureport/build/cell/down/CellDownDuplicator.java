@@ -81,9 +81,6 @@ public class CellDownDuplicator {
 		}else{
 			nonChild=true;
 		}
-		if(newCell.getTopParentCell()==originalCell){
-			newCell.setTopParentCell(leftParent);
-		}
 		Cell leftParentCell=newCell.getLeftParentCell();
 		if(leftParentCell!=null){
 			leftParentCell.addRowChild(newCell);

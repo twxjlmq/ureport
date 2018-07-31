@@ -30,6 +30,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -65,6 +67,7 @@ import com.bstek.ureport.expression.ExpressionUtils;
 import com.bstek.ureport.expression.model.Expression;
 import com.bstek.ureport.expression.model.data.ExpressionData;
 import com.bstek.ureport.expression.model.data.ObjectExpressionData;
+import com.bstek.ureport.utils.ProcedureUtils;
 
 /**
  * @author Jacky.gao
@@ -77,15 +80,6 @@ public class DatasourceServletAction extends RenderPageServletAction {
 		String method=retriveMethod(req);
 		if(method!=null){
 			invokeMethod(method, req, resp);
-		}else{
-			/*VelocityContext context = new VelocityContext();
-			context.put("contextPath", req.getContextPath());
-			resp.setContentType("text/html");
-			resp.setCharacterEncoding("utf-8");
-			Template template=ve.getTemplate("html/designer.html","utf-8");
-			PrintWriter writer=resp.getWriter();
-			template.merge(context, writer);
-			writer.close();*/
 		}
 	}
 	
@@ -167,16 +161,8 @@ public class DatasourceServletAction extends RenderPageServletAction {
 		}catch(Exception ex){
 			throw new ServletException(ex);
 		}finally{
-			try {
-				if(rs!=null){
-					rs.close();
-				}
-				if(conn!=null){
-					conn.close();
-				}
-			} catch (SQLException e) {
-				e.printStackTrace();
-			}
+			JdbcUtils.closeResultSet(rs);
+			JdbcUtils.closeConnection(conn);
 		}
 	}
 	
@@ -189,27 +175,32 @@ public class DatasourceServletAction extends RenderPageServletAction {
 			conn=buildConnection(req);
 			Map<String, Object> map = buildParameters(parameters);
 			sql=parseSql(sql, map);
-			DataSource dataSource=new SingleConnectionDataSource(conn,false);
-			NamedParameterJdbcTemplate jdbc=new NamedParameterJdbcTemplate(dataSource);
-			PreparedStatementCreator statementCreator=getPreparedStatementCreator(sql,new MapSqlParameterSource(map));
-			jdbc.getJdbcOperations().execute(statementCreator, new PreparedStatementCallback<Object>() {
-				@Override
-				public Object doInPreparedStatement(PreparedStatement ps) throws SQLException, DataAccessException {
-					ResultSet rs = null;
-					try {
-						rs = ps.executeQuery();
-						ResultSetMetaData metadata=rs.getMetaData();
-						int columnCount=metadata.getColumnCount();
-						for(int i=0;i<columnCount;i++){
-							String columnName=metadata.getColumnLabel(i+1);
-							fields.add(new Field(columnName));
+			if(ProcedureUtils.isProcedure(sql)){
+				List<Field> fieldsList = ProcedureUtils.procedureColumnsQuery(sql, map, conn);
+				fields.addAll(fieldsList);
+			}else{
+				DataSource dataSource=new SingleConnectionDataSource(conn,false);
+				NamedParameterJdbcTemplate jdbc=new NamedParameterJdbcTemplate(dataSource);
+				PreparedStatementCreator statementCreator=getPreparedStatementCreator(sql,new MapSqlParameterSource(map));
+				jdbc.getJdbcOperations().execute(statementCreator, new PreparedStatementCallback<Object>() {
+					@Override
+					public Object doInPreparedStatement(PreparedStatement ps) throws SQLException, DataAccessException {
+						ResultSet rs = null;
+						try {
+							rs = ps.executeQuery();
+							ResultSetMetaData metadata=rs.getMetaData();
+							int columnCount=metadata.getColumnCount();
+							for(int i=0;i<columnCount;i++){
+								String columnName=metadata.getColumnLabel(i+1);
+								fields.add(new Field(columnName));
+							}
+							return null;
+						}finally {
+							JdbcUtils.closeResultSet(rs);
 						}
-						return null;
-					}finally {
-						JdbcUtils.closeResultSet(rs);
 					}
-				}
-			});
+				});
+			}
 			writeObjectToJson(resp, fields);
 		}catch(Exception ex){
 			throw new ReportDesignException(ex);
@@ -235,9 +226,14 @@ public class DatasourceServletAction extends RenderPageServletAction {
 		Connection conn=null;
 		try{
 			conn=buildConnection(req);
-			DataSource dataSource=new SingleConnectionDataSource(conn,false);
-			NamedParameterJdbcTemplate jdbc=new NamedParameterJdbcTemplate(dataSource);
-			List<Map<String,Object>> list=jdbc.queryForList(sql, map);
+			List<Map<String,Object>> list=null;
+			if(ProcedureUtils.isProcedure(sql)){
+				list=ProcedureUtils.procedureQuery(sql, map, conn);
+			}else{
+				DataSource dataSource=new SingleConnectionDataSource(conn,false);
+				NamedParameterJdbcTemplate jdbc=new NamedParameterJdbcTemplate(dataSource);
+				list=jdbc.queryForList(sql, map);				
+			}
 			int size=list.size();
 			int currentTotal=size;
 			if(currentTotal>500){
@@ -275,22 +271,41 @@ public class DatasourceServletAction extends RenderPageServletAction {
 	
 	private String parseSql(String sql,Map<String,Object> parameters){
 		sql=sql.trim();
-		if(sql.startsWith(ExpressionUtils.SQL_EXPR_PREFIX) && sql.endsWith(ExpressionUtils.SQL_EXPR_SUFFIX)){
+		Context context=new Context(applicationContext, parameters);
+		if(sql.startsWith(ExpressionUtils.EXPR_PREFIX) && sql.endsWith(ExpressionUtils.EXPR_SUFFIX)){
 			sql=sql.substring(2, sql.length()-1);
 			Expression expr=ExpressionUtils.parseExpression(sql);
-			Context context=new Context(applicationContext, parameters);
-			ExpressionData<?> exprData=expr.execute(null,null, context);
-			if(exprData instanceof ObjectExpressionData){
-				ObjectExpressionData objExprData=(ObjectExpressionData)exprData;
-				Object obj=objExprData.getData();
-				if(obj!=null){
-					sql=obj.toString();
-					sql=sql.replaceAll("\\\\", "");
-					return sql;
-				}
+			sql=executeSqlExpr(expr,context);
+			return sql;
+		}else{
+			String sqlForUse=sql;
+			Pattern pattern=Pattern.compile("\\$\\{.*?\\}");
+			Matcher matcher=pattern.matcher(sqlForUse);
+			while(matcher.find()){
+				String substr=matcher.group();
+				String sqlExpr=substr.substring(2,substr.length()-1);
+				Expression expr=ExpressionUtils.parseExpression(sqlExpr);
+				String result=executeSqlExpr(expr, context);
+				sqlForUse=sqlForUse.replace(substr, result);
+			}
+			Utils.logToConsole("DESIGN SQL:"+sqlForUse);
+			return sqlForUse;
+		}
+	}
+	
+	private String executeSqlExpr(Expression sqlExpr,Context context){
+		String sqlForUse=null;
+		ExpressionData<?> exprData=sqlExpr.execute(null, null, context);
+		if(exprData instanceof ObjectExpressionData){
+			ObjectExpressionData data=(ObjectExpressionData)exprData;
+			Object obj=data.getData();
+			if(obj!=null){
+				String s=obj.toString();
+				s=s.replaceAll("\\\\", "");
+				sqlForUse=s;
 			}
 		}
-		return sql;
+		return sqlForUse;
 	}
 	
 	public void testConnection(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -347,6 +362,7 @@ public class DatasourceServletAction extends RenderPageServletAction {
 					}else{
 						map.put(name, "null");						
 					}
+					break;
 				case List:
 					map.put(name, new ArrayList<Object>());
 				}				

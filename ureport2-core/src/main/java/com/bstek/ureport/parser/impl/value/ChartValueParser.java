@@ -1,3 +1,18 @@
+/*******************************************************************************
+ * Copyright 2017 Bstek
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License.  You may obtain a copy
+ * of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ ******************************************************************************/
 package com.bstek.ureport.parser.impl.value;
 
 import org.apache.commons.lang3.StringUtils;
@@ -28,6 +43,7 @@ import com.bstek.ureport.chart.option.Position;
 import com.bstek.ureport.chart.option.impl.AnimationsOption;
 import com.bstek.ureport.chart.option.impl.LegendOption;
 import com.bstek.ureport.chart.option.impl.TitleOption;
+import com.bstek.ureport.chart.plugins.DataLabelsPlugin;
 import com.bstek.ureport.definition.value.ChartValue;
 import com.bstek.ureport.definition.value.Value;
 import com.bstek.ureport.exception.ReportParseException;
@@ -62,6 +78,13 @@ public class ChartValueParser extends ValueParser {
 				chart.setYaxes(yaxes);
 			}else if(name.equals("option")){
 				chart.getOptions().add(parseOption(ele));
+			}else if(name.equals("plugin")) {
+				String pluginName=ele.attributeValue("name");
+				if(pluginName.equals("data-labels")) {					
+					DataLabelsPlugin plugin=new DataLabelsPlugin();
+					plugin.setDisplay(Boolean.valueOf(ele.attributeValue("display")));
+					chart.getPlugins().add(plugin);
+				}
 			}
 		}
 		return value;

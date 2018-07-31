@@ -3,7 +3,7 @@
  */
 import * as utils from '../Utils.js';
 import {afterRenderer} from './CellRenderer.js';
-import {contextMenuConfigure} from './ContextMenu.js';
+import buildMenuConfigure from './ContextMenu.js';
 import Handsontable from 'handsontable';
 
 export default class ReportTable{
@@ -116,7 +116,7 @@ export default class ReportTable{
                 if(file!=='classpath:template/template.ureport.xml'){
                     _this.hot.context.fileInfo.setFile(file);
                 }else{
-                    _this.hot.context.fileInfo.setFile("未命名");
+                    _this.hot.context.fileInfo.setFile(`${window.i18n.table.report.tip}`);
                 }
                 if(reportDef.paper.bgImage){
                     $('.ht_master').css('background',`url(${reportDef.paper.bgImage}) 50px 26px no-repeat`);
@@ -124,8 +124,12 @@ export default class ReportTable{
                     $('.ht_master').css('background','transparent');
                 }
             },
-            error:function(){
-                alert(`加载报表文件${file}失败!`);
+            error:function(response){
+                if(response && response.responseText){
+                    alert("服务端错误："+response.responseText+"");
+                }else{
+                    alert(`${window.i18n.table.report.load}${file}${window.i18n.table.report.fail}`);
+                }
             }
         });
     }
@@ -182,7 +186,7 @@ export default class ReportTable{
 
     buildMenu(){
         this.hot.updateSettings({
-            contextMenu: contextMenuConfigure
+            contextMenu: buildMenuConfigure()
         });
     }
 

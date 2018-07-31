@@ -5,7 +5,7 @@ import UndoManager from 'undo-manager';
 import {alert} from './MsgBox.js';
 
 export function showLoading(){
-    const url=window._server+'/res/ureport-asserts/icons/loading.svg';
+    const url=window._server+'/res/ureport-asserts/icons/loading.gif';
     const h=$(window).height()/2,w=$(window).width()/2;
     const cover=$(`<div class="ureport-loading-cover" style="position: absolute;left: 0px;top: 0px;width:${w*2}px;height:${h*2}px;z-index: 1199;background:rgba(222,222,222,.5)"></div>`);
     $(document.body).append(cover);
@@ -164,29 +164,36 @@ export function tableToXml(context){
                     alert(msg);
                     throw msg;
                 }
-                cellXml+=`<dataset-value dataset-name="${encode(value.datasetName)}" aggregate="${value.aggregate}" property="${value.property}" order="${value.order}">`;
+                const mappingType=value.mappingType || 'simple';
+                cellXml+=`<dataset-value dataset-name="${encode(value.datasetName)}" aggregate="${value.aggregate}" property="${value.property}" order="${value.order}" mapping-type="${mappingType}"`;
+                if(mappingType==='dataset'){
+                    cellXml+=` mapping-dataset="${value.mappingDataset}" mapping-key-property="${value.mappingKeyProperty}" mapping-value-property="${value.mappingValueProperty}"`;
+                }
+                cellXml+='>';
                 cellXml+=buildConditions(value.conditions);
                 if(value.aggregate==='customgroup'){
                     const groupItems=value.groupItems;
                     for(let groupItem of groupItems){
                         cellXml+=`<group-item name="${groupItem.name}">`;
                         for(let condition of groupItem.conditions){
-                            cellXml+=`<condition property="${condition.leftProperty}" op="${encode(condition.op)}" id="${condition.id}"`;
+                            cellXml+=`<condition property="${condition.left}" op="${encode(condition.operation || condition.op)}" id="${condition.id}"`;
                             if(condition.join){
                                 cellXml+=` join="${condition.join}">`;
                             }else{
                                 cellXml+=`>`;
                             }
-                            cellXml+=`<value><![CDATA[${condition.rightExpression}]]></value>`;
+                            cellXml+=`<value><![CDATA[${condition.right}]]></value>`;
                             cellXml+=`</condition>`;
                         }
                         cellXml+='</group-item>';
                     }
                 }
-                const mappingItems=value.mappingItems;
-                if(mappingItems && mappingItems.length>0){
-                    for(let mappingItem of mappingItems){
-                        cellXml+=`<mapping-item value="${encode(mappingItem.value)}" label="${encode(mappingItem.label)}"/>`;
+                if(mappingType==='simple'){
+                    const mappingItems=value.mappingItems;
+                    if(mappingItems && mappingItems.length>0){
+                        for(let mappingItem of mappingItems){
+                            cellXml+=`<mapping-item value="${encode(mappingItem.value)}" label="${encode(mappingItem.label)}"/>`;
+                        }
                     }
                 }
                 cellXml+=`</dataset-value>`;
@@ -204,7 +211,14 @@ export function tableToXml(context){
                 cellXml+=`<![CDATA[${value.value || ''}]]>`;
                 cellXml+=`</simple-value>`;
             }else if(value.type==='image'){
-                cellXml+=`<image-value source="${value.source}">`;
+                cellXml+=`<image-value source="${value.source}"`;
+                if(value.width){
+                    cellXml+=` width="${value.width}"`
+                }
+                if(value.height){
+                    cellXml+=` height="${value.height}"`;
+                }
+                cellXml+=`>`;
                 cellXml+=`<text>`;
                 cellXml+=`<![CDATA[${value.value}]]>`;
                 cellXml+=`</text>`;
@@ -303,7 +317,7 @@ export function tableToXml(context){
                         if(option.position){
                             cellXml+=` position="${option.position}"`;
                         }
-                        if(option.display){
+                        if(option.display!==undefined && option.display!==null){
                             cellXml+=` display="${option.display}"`;
                         }
                         if(option.duration){
@@ -317,6 +331,13 @@ export function tableToXml(context){
                         }
                         cellXml+=`/>`;
                     }
+                }
+                const plugins=chart.plugins || [];
+                for(let plugin of plugins){
+                    cellXml+=`<plugin name="${plugin.name}" display="${plugin.display}"/>`;
+                }
+                if(plugins){
+
                 }
                 cellXml+=`</chart-value>`;
             }
@@ -500,7 +521,11 @@ export function tableToXml(context){
         xml+=` column-count="${paper.columnCount}" column-margin="${paper.columnMargin}"`;
     }
     xml+=`></paper>`;
+    if(context.reportDef.searchFormXml){
+        xml+=context.reportDef.searchFormXml;
+    }
     xml+=`</ureport>`;
+    xml=encodeURIComponent(xml);
     return xml;
 };
 
@@ -615,6 +640,9 @@ function buildCellStyle(cellStyle,condition){
     }
     if(cellStyle.valignScope){
         cellXml+=` valign-scope="${cellStyle.valignScope}"`;
+    }
+    if(cellStyle.lineHeight){
+        cellXml+=` line-height="${cellStyle.lineHeight}"`;
     }
     cellXml+='>';
     let leftBorder=cellStyle.leftBorder;

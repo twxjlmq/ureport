@@ -27,6 +27,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang.StringUtils;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
@@ -42,7 +43,7 @@ public class UReportServlet extends HttpServlet {
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
-		WebApplicationContext applicationContext = WebApplicationContextUtils.getWebApplicationContext(config.getServletContext());
+		WebApplicationContext applicationContext = getWebApplicationContext(config);
 		Collection<ServletAction> handlers = applicationContext.getBeansOfType(ServletAction.class).values();
 		for (ServletAction handler : handlers) {
 			String url = handler.url();
@@ -51,6 +52,10 @@ public class UReportServlet extends HttpServlet {
 			}
 			actionMap.put(url, handler);
 		}
+	}
+	
+	protected WebApplicationContext getWebApplicationContext(ServletConfig config){
+		return WebApplicationContextUtils.getWebApplicationContext(config.getServletContext());
 	}
 
 	@Override
@@ -74,9 +79,27 @@ public class UReportServlet extends HttpServlet {
 		RequestHolder.setRequest(req);
 		try{
 			targetHandler.execute(req, resp);
+		}catch(Exception ex){
+			resp.setCharacterEncoding("UTF-8");
+			PrintWriter pw=resp.getWriter();
+			Throwable e=buildRootException(ex);
+			resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+			String errorMsg = e.getMessage();
+			if(StringUtils.isBlank(errorMsg)){
+				errorMsg=e.getClass().getName();
+			}
+			pw.write(errorMsg);
+			pw.close();				
+			throw new ServletException(ex);	
 		}finally{
 			RequestHolder.clean();
 		}
+	}
+	private Throwable buildRootException(Throwable throwable){
+		if(throwable.getCause()==null){
+			return throwable;
+		}
+		return buildRootException(throwable.getCause());
 	}
 
 	private void outContent(HttpServletResponse resp, String msg) throws IOException {

@@ -101,9 +101,6 @@ public class CellRightDuplicator {
 		}else{
 			nonChild=true;
 		}
-		if(newCell.getLeftParentCell()==originalCell){
-			newCell.setLeftParentCell(topParent);
-		}
 		Cell leftParentCell=newCell.getLeftParentCell();
 		if(leftParentCell!=null){
 			leftParentCell.addRowChild(newCell);

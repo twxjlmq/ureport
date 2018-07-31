@@ -23,6 +23,7 @@ import com.bstek.ureport.Utils;
 import com.bstek.ureport.dsl.ReportParserParser.CellNameExprConditionContext;
 import com.bstek.ureport.dsl.ReportParserParser.ConditionContext;
 import com.bstek.ureport.dsl.ReportParserParser.ConditionsContext;
+import com.bstek.ureport.dsl.ReportParserParser.CurrentValueConditionContext;
 import com.bstek.ureport.dsl.ReportParserParser.ExprConditionContext;
 import com.bstek.ureport.dsl.ReportParserParser.ExprContext;
 import com.bstek.ureport.dsl.ReportParserParser.JoinContext;
@@ -35,6 +36,7 @@ import com.bstek.ureport.expression.model.Op;
 import com.bstek.ureport.expression.model.condition.BaseCondition;
 import com.bstek.ureport.expression.model.condition.BothExpressionCondition;
 import com.bstek.ureport.expression.model.condition.CellExpressionCondition;
+import com.bstek.ureport.expression.model.condition.CurrentValueExpressionCondition;
 import com.bstek.ureport.expression.model.condition.Join;
 import com.bstek.ureport.expression.model.condition.PropertyExpressionCondition;
 import com.bstek.ureport.expression.model.expr.BaseExpression;
@@ -71,18 +73,21 @@ public abstract class BaseExpressionBuilder implements ExpressionBuilder{
 		List<ConditionContext> conditionContextList=conditionsContext.condition();
 		List<JoinContext> joins=conditionsContext.join();
 		BaseCondition condition=null;
+		BaseCondition topCondition=null;
 		int opIndex=0;
 		for(ConditionContext conditionCtx:conditionContextList){
 			if(condition==null){
 				condition=parseCondition(conditionCtx);
+				topCondition=condition;
 			}else{
 				BaseCondition nextCondition=parseCondition(conditionCtx);
 				condition.setNextCondition(nextCondition);
 				condition.setJoin(Join.parse(joins.get(opIndex).getText()));
 				opIndex++;
+				condition=nextCondition;
 			}
 		}
-		return condition;
+		return topCondition;
 	}
 	private BaseCondition parseCondition(ConditionContext context){
 		if(context instanceof ExprConditionContext){
@@ -94,6 +99,15 @@ public abstract class BaseExpressionBuilder implements ExpressionBuilder{
 			Expression leftExpr=ExpressionUtils.parseExpression(left);
 			condition.setLeftExpression(leftExpr);
 			String rightExpr=exprContexts.get(1).getText();
+			condition.setRight(rightExpr);
+			condition.setRightExpression(ExpressionUtils.parseExpression(rightExpr));
+			condition.setOp(parseOp(ctx.OP()));
+			condition.setOperation(ctx.OP().getText());
+			return condition;
+		}else if(context instanceof CurrentValueConditionContext){
+			CurrentValueConditionContext ctx=(CurrentValueConditionContext)context;
+			CurrentValueExpressionCondition condition=new CurrentValueExpressionCondition();
+			String rightExpr=ctx.expr().getText();
 			condition.setRight(rightExpr);
 			condition.setRightExpression(ExpressionUtils.parseExpression(rightExpr));
 			condition.setOp(parseOp(ctx.OP()));

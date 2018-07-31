@@ -69,6 +69,7 @@ import com.bstek.ureport.model.Image;
 import com.bstek.ureport.model.Report;
 import com.bstek.ureport.model.Row;
 import com.bstek.ureport.utils.ImageUtils;
+import com.bstek.ureport.utils.UnitUtils;
 
 /**
  * @author Jacky.gao
@@ -111,8 +112,8 @@ public class WordProducer implements Producer{
 			pageMar.setTop(BigInteger.valueOf(DxaUtils.points2dxa(paper.getTopMargin())));
 			pageMar.setBottom(BigInteger.valueOf(DxaUtils.points2dxa(paper.getBottomMargin())));
 			List<Column> columns=report.getColumns();
-			int totalColumn=buildColumnSize(columns);
-			int tableWidth=buildTablePCTWidth(columns);
+			int intArr[]=buildColumnSizeAndTotalWidth(columns);
+			int totalColumn=intArr[0],tableWidth=intArr[1];
 			List<Page> pages=report.getPages();
 			Map<Row,Map<Column,Cell>> cellMap=report.getRowColCellMap();
 			int totalPages=pages.size();
@@ -122,19 +123,21 @@ public class WordProducer implements Producer{
 				XWPFTable table = document.createTable(rows.size(), totalColumn);
 				table.getCTTbl().getTblPr().unsetTblBorders();
 				table.getCTTbl().addNewTblPr().addNewTblW().setW(BigInteger.valueOf(DxaUtils.points2dxa(tableWidth)));
-				for(Row row:rows){
+				for(int rowNumber=0;rowNumber<rows.size();rowNumber++){
+					Row row=rows.get(rowNumber);
 					int height=row.getRealHeight();
-					int rowNumber=rows.indexOf(row);
 					XWPFTableRow tableRow=table.getRow(rowNumber);
 					tableRow.setHeight(DxaUtils.points2dxa(height));
 					Map<Column,Cell> colCell=cellMap.get(row);
 					if(colCell==null)continue;
+					int skipCol=0;
 					for(Column col:columns){
 						int width=col.getWidth();
 						if(width<1){
+							skipCol++;
 							continue;
 						}
-						int colNumber=col.getColumnNumber()-1;
+						int colNumber=col.getColumnNumber()-1-skipCol;
 						Cell cell=colCell.get(col);
 						if(cell==null){
 							continue;
@@ -167,8 +170,8 @@ public class WordProducer implements Producer{
 		}
 	}
 	
-	private int buildColumnSize(List<Column> columns){
-		int count=0;
+	private int[] buildColumnSizeAndTotalWidth(List<Column> columns){
+		int count=0,totalWidth=0;
 		for(int i=0;i<columns.size();i++){
 			Column col=columns.get(i);
 			int width=col.getWidth();
@@ -176,8 +179,9 @@ public class WordProducer implements Producer{
 				continue;
 			}
 			count++;
+			totalWidth+=width;
 		}
-		return count;
+		return new int[]{count,totalWidth};
 	}
 	
 	private void buildTableCellStyle(XWPFTable table,XWPFTableCell tableCell,Cell cell,int rowNumber,int columnNumber){
@@ -319,25 +323,29 @@ public class WordProducer implements Producer{
 				}
 			}
 			String base64Data=img.getBase64Data();
-			InputStream inputStream=null;
-			try{
-				inputStream=ImageUtils.base64DataToInputStream(base64Data);
-				BufferedImage bufferedImage=ImageIO.read(inputStream);
-				int width=bufferedImage.getWidth();
-				int height=bufferedImage.getHeight();
-				IOUtils.closeQuietly(inputStream);
-				inputStream=ImageUtils.base64DataToInputStream(base64Data);
-				if(imageType.equals("jpeg")){
-					run.addPicture(inputStream, XWPFDocument.PICTURE_TYPE_JPEG, "ureport-"+rowNumber+"-"+columnNumber+".jpg", Units.toEMU(width), Units.toEMU(height));					
-				}else if(imageType.equals("png")){
-					run.addPicture(inputStream, XWPFDocument.PICTURE_TYPE_PNG, "ureport-"+rowNumber+"-"+columnNumber+".png", Units.toEMU(width), Units.toEMU(height));					
-				}else if(imageType.equals("gif")){
-					run.addPicture(inputStream, XWPFDocument.PICTURE_TYPE_GIF, "ureport-"+rowNumber+"-"+columnNumber+".gif", Units.toEMU(width), Units.toEMU(height));					
+			if(StringUtils.isNotBlank(base64Data)){
+				InputStream inputStream=null;
+				try{
+					inputStream=ImageUtils.base64DataToInputStream(base64Data);
+					BufferedImage bufferedImage=ImageIO.read(inputStream);
+					int width=bufferedImage.getWidth();
+					int height=bufferedImage.getHeight();
+					IOUtils.closeQuietly(inputStream);
+					inputStream=ImageUtils.base64DataToInputStream(base64Data);
+					width=UnitUtils.pixelToPoint(width);
+					height=UnitUtils.pixelToPoint(height);
+					if(imageType.equals("jpeg")){
+						run.addPicture(inputStream, XWPFDocument.PICTURE_TYPE_JPEG, "ureport-"+rowNumber+"-"+columnNumber+".jpg", Units.toEMU(width), Units.toEMU(height));					
+					}else if(imageType.equals("png")){
+						run.addPicture(inputStream, XWPFDocument.PICTURE_TYPE_PNG, "ureport-"+rowNumber+"-"+columnNumber+".png", Units.toEMU(width), Units.toEMU(height));					
+					}else if(imageType.equals("gif")){
+						run.addPicture(inputStream, XWPFDocument.PICTURE_TYPE_GIF, "ureport-"+rowNumber+"-"+columnNumber+".gif", Units.toEMU(width), Units.toEMU(height));					
+					}
+				}catch(Exception ex){
+					throw new ReportComputeException(ex);
+				}finally{
+					IOUtils.closeQuietly(inputStream);
 				}
-			}catch(Exception ex){
-				throw new ReportComputeException(ex);
-			}finally{
-				IOUtils.closeQuietly(inputStream);
 			}
 		}else if(value instanceof Date){
 			Date date=(Date)value;
@@ -452,6 +460,9 @@ public class WordProducer implements Producer{
 				para.setAlignment(ParagraphAlignment.CENTER);
 			}
 		}
+		if(style.getLineHeight()>0){
+			para.setSpacingBetween(style.getLineHeight());			
+		}
 		align=style.getValign();
 		if(customStyle!=null && customStyle.getValign()!=null){
 			align=customStyle.getValign();
@@ -559,14 +570,6 @@ public class WordProducer implements Producer{
 		if(StringUtils.isNotBlank(color)){
 			ctborder.setColor(toHex(color.split(",")));
 		}
-	}
-
-	private int buildTablePCTWidth(List<Column> columns){
-		int width=0;
-		for(Column col:columns){
-			width+=col.getWidth();
-		}
-		return width;
 	}
 	
 	

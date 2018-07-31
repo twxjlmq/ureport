@@ -18,6 +18,8 @@ package com.bstek.ureport.build.compute;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.bstek.ureport.build.BindData;
 import com.bstek.ureport.build.Context;
 import com.bstek.ureport.definition.value.ImageValue;
@@ -38,10 +40,11 @@ public class ImageValueCompute implements ValueCompute{
 	@Override
 	public List<BindData> compute(Cell cell, Context context) {
 		ImageValue value=(ImageValue)cell.getValue();
+		int width=value.getWidth(),height=value.getHeight();
 		Source source=value.getSource();
 		List<BindData> list=new ArrayList<BindData>();
 		if(source.equals(Source.text)){
-			String base64Data=ImageUtils.getImageBase64Data(ImageType.image, value.getValue());
+			String base64Data=ImageUtils.getImageBase64Data(ImageType.image, value.getValue(),width,height);
 			list.add(new BindData(new Image(base64Data,value.getValue(),-1,-1)));			
 		}else{
 			Expression expression=value.getExpression();
@@ -63,10 +66,10 @@ public class ImageValueCompute implements ValueCompute{
 					}else{
 						path=o.toString();
 					}
-					if(path==null){
+					if(StringUtils.isBlank(path)){
 						continue;
 					}
-					String base64Data=ImageUtils.getImageBase64Data(ImageType.image, path);
+					String base64Data=ImageUtils.getImageBase64Data(ImageType.image, path,width,height);
 					list.add(new BindData(new Image(base64Data,path,-1,-1)));						
 				}
 			}else if(obj instanceof BindData){
@@ -76,8 +79,8 @@ public class ImageValueCompute implements ValueCompute{
 				if(valueData!=null){
 					path=valueData.toString();
 				}
-				if(path!=null){
-					String base64Data=ImageUtils.getImageBase64Data(ImageType.image, path);
+				if(StringUtils.isNotBlank(path)){
+					String base64Data=ImageUtils.getImageBase64Data(ImageType.image, path,width,height);
 					list.add(new BindData(new Image(base64Data,path,-1,-1)));
 				}
 			}else if(obj instanceof String){
@@ -85,11 +88,11 @@ public class ImageValueCompute implements ValueCompute{
 				if(text.startsWith("\"") && text.endsWith("\"")){
 					text=text.substring(1,text.length()-1);
 				}
-				String base64Data=ImageUtils.getImageBase64Data(ImageType.image, text);
+				String base64Data=ImageUtils.getImageBase64Data(ImageType.image, text,width,height);
 				list.add(new BindData(new Image(base64Data,text,-1,-1)));			
 			}else{
-				if(obj!=null){
-					String base64Data=ImageUtils.getImageBase64Data(ImageType.image, obj.toString());
+				if(obj!=null && StringUtils.isNotBlank(obj.toString())){
+					String base64Data=ImageUtils.getImageBase64Data(ImageType.image, obj.toString(),width,height);
 					list.add(new BindData(new Image(base64Data,obj.toString(),-1,-1)));					
 				}
 			}

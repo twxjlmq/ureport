@@ -25,7 +25,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.bstek.ureport.exception.ReportComputeException;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -33,14 +33,34 @@ import com.bstek.ureport.exception.ReportComputeException;
  * @since 2016年6月3日
  */
 public abstract class BaseServletAction implements ServletAction {
-	
+	protected Throwable buildRootException(Throwable throwable){
+		if(throwable.getCause()==null){
+			return throwable;
+		}
+		return buildRootException(throwable.getCause());
+	}
+
 	protected String decode(String value){
+		if(value==null){
+			return value;
+		}
 		try{
 			value=URLDecoder.decode(value, "utf-8");
 			value=URLDecoder.decode(value, "utf-8");
 			return value;
 		}catch(Exception ex){
-			throw new ReportComputeException(ex);
+			return value;
+		}
+	}
+	protected String decodeContent(String content){
+		if(content==null){
+			return content;
+		}
+		try{
+			content=URLDecoder.decode(content, "utf-8");
+			return content;
+		}catch(Exception ex){
+			return content;
 		}
 	}
 	
@@ -81,5 +101,25 @@ public abstract class BaseServletAction implements ServletAction {
 			return methodName.length()>0 ? methodName : null;
 		}
 		return null;
+	}
+	
+	protected String buildDownloadFileName(String reportFileName,String fileName,String extName){
+		if(StringUtils.isNotBlank(fileName)){
+			fileName=decode(fileName);
+			if(!fileName.toLowerCase().endsWith(extName)){
+				fileName=fileName+extName;
+			}
+			return fileName;
+		}else{
+			int pos=reportFileName.indexOf(":");
+			if(pos>0){
+				reportFileName=reportFileName.substring(pos+1,reportFileName.length());
+			}
+			pos=reportFileName.toLowerCase().indexOf(".ureport.xml");
+			if(pos>0){
+				reportFileName=reportFileName.substring(0,pos);
+			}
+			return "ureport-"+reportFileName+extName;
+		}
 	}
 }

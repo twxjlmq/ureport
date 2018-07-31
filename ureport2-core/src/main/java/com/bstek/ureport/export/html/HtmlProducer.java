@@ -18,14 +18,21 @@ package com.bstek.ureport.export.html;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import com.bstek.ureport.build.BindData;
 import com.bstek.ureport.build.Context;
 import com.bstek.ureport.build.paging.Page;
 import com.bstek.ureport.chart.ChartData;
 import com.bstek.ureport.definition.Alignment;
 import com.bstek.ureport.definition.Border;
 import com.bstek.ureport.definition.CellStyle;
+import com.bstek.ureport.expression.model.Expression;
+import com.bstek.ureport.expression.model.data.BindDataListExpressionData;
+import com.bstek.ureport.expression.model.data.ExpressionData;
+import com.bstek.ureport.expression.model.data.ObjectExpressionData;
+import com.bstek.ureport.expression.model.data.ObjectListExpressionData;
 import com.bstek.ureport.model.Cell;
 import com.bstek.ureport.model.Column;
 import com.bstek.ureport.model.Image;
@@ -146,18 +153,49 @@ public class HtmlProducer{
 				boolean hasLink=false;
 				String linkURL=cell.getLinkUrl();
 				if(StringUtils.isNotBlank(linkURL)){
+					Expression urlExpression=cell.getLinkUrlExpression();
+					if(urlExpression!=null){
+						ExpressionData<?> exprData=urlExpression.execute(cell, cell, context);
+						if(exprData instanceof BindDataListExpressionData){
+							BindDataListExpressionData listExprData=(BindDataListExpressionData)exprData;
+							List<BindData> bindDataList=listExprData.getData();
+							if(bindDataList!=null && bindDataList.size()>0){
+								Object data=bindDataList.get(0).getValue();
+								if(data!=null){
+									linkURL=data.toString();
+								}
+							}
+						}else if(exprData instanceof ObjectExpressionData){
+							ObjectExpressionData objExprData=(ObjectExpressionData)exprData;
+							Object data=objExprData.getData();
+							if(data!=null){
+								linkURL=data.toString();
+							}
+						}else if(exprData instanceof ObjectListExpressionData){
+							ObjectListExpressionData objListExprData=(ObjectListExpressionData)exprData;
+							List<?> list=objListExprData.getData();
+							if(list!=null && list.size()>0){
+								Object data=list.get(0);
+								if(data!=null){
+									linkURL=data.toString();
+								}
+							}
+						}
+					}
 					hasLink=true;
 					String urlParameter=cell.buildLinkParameters(context);
-					if(linkURL.indexOf("?")==-1){
-						linkURL+="?"+urlParameter;
-					}else{
-						linkURL+="&"+urlParameter;
+					if(StringUtils.isNotBlank(urlParameter)) {
+						if(linkURL.indexOf("?")==-1){
+							linkURL+="?"+urlParameter;
+						}else{
+							linkURL+="&"+urlParameter;
+						}						
 					}
 					String target=cell.getLinkTargetWindow();
 					if(StringUtils.isBlank(target))target="_self";
 					sb.append("<a href=\""+linkURL+"\" target=\""+target+"\">");
 				}
-				Object obj=(cell.getFormatData()== null) ? "&nbsp;" : cell.getFormatData();
+				Object obj=(cell.getFormatData()== null) ? "" : cell.getFormatData();
 				if(obj instanceof Image){
 					Image img=(Image)obj;
 					String path=img.getPath();
@@ -175,12 +213,27 @@ public class HtmlProducer{
 				}else if(obj instanceof ChartData){
 					ChartData chartData=(ChartData)obj;
 					String canvasId=chartData.getId();
-					sb.append("<canvas id=\""+canvasId+"\"></canvas>");
+					int width=col.getWidth()-2;
+					if(colSpan>0){
+						width=buildWidth(columns,j,colSpan)-2;
+					}
+					if(rowSpan>0){
+						height=buildHeight(rows,i,rowSpan)-2;
+					}else{
+						height-=2;
+					}
+					sb.append("<div style=\"position: relative;width:"+width+"pt;height:"+height+"pt\">");
+					sb.append("<canvas id=\""+canvasId+"\" style=\"width:"+width+"px !important;height:"+height+"px !important\"></canvas>");
+					sb.append("</div>");
 				}else{
 					String text=obj.toString();
+					text=StringEscapeUtils.escapeHtml4(text);
 					text=text.replaceAll("\r\n", "<br>");
 					text=text.replaceAll("\n", "<br>");
 					text=text.replaceAll(" ", "&nbsp;");
+					if(text.equals("")){
+						text="&nbsp;";
+					}
 					sb.append(text);					
 				}
 				if(hasLink){
@@ -192,6 +245,26 @@ public class HtmlProducer{
 		}
 		sb.append("</table>");
 		return sb;
+	}
+	
+	private int buildWidth(List<Column> columns,int colIndex,int colSpan){
+		int width=0;
+		int start=colIndex,end=colIndex+colSpan;
+		for(int i=start;i<end;i++){
+			Column col=columns.get(i);
+			width+=col.getWidth();
+		}
+		return width;
+	}
+	
+	private int buildHeight(List<Row> rows,int rowIndex,int rowSpan){
+		int height=0;
+		int start=rowIndex,end=rowIndex+rowSpan;
+		for(int i=start;i<end;i++){
+			Row row=rows.get(i);
+			height+=row.getRealHeight();
+		}
+		return height;
 	}
 	
 	private String buildCustomStyle(Cell cell){
@@ -359,6 +432,8 @@ public class HtmlProducer{
 			sb.append("border-bottom:"+bottomBorder.getStyle().name()+" "+bottomBorder.getWidth()+"px rgb("+bottomBorder.getColor()+");");
 		}
 		if(sb.length()>0){
+			int colWidth=cell.getColumn().getWidth();
+			sb.append("width:"+colWidth+"pt");
 			sb.insert(0, "style=\"");
 			sb.append("\"");
 		}

@@ -27,6 +27,7 @@ import com.bstek.ureport.chart.dataset.impl.ScatterDataset;
 import com.bstek.ureport.chart.dataset.impl.category.BarDataset;
 import com.bstek.ureport.chart.dataset.impl.category.LineDataset;
 import com.bstek.ureport.chart.option.Option;
+import com.bstek.ureport.chart.plugins.Plugin;
 import com.bstek.ureport.model.Cell;
 
 /**
@@ -34,23 +35,52 @@ import com.bstek.ureport.model.Cell;
  * @since 2017年6月8日
  */
 public class Chart {
-	private List<Option> options=new ArrayList<Option>();
 	private Dataset dataset;
 	private XAxes xaxes;
 	private YAxes yaxes;
+	private List<Option> options=new ArrayList<Option>();
+	private List<Plugin> plugins=new ArrayList<Plugin>();
 	public ChartData doCompute(Cell cell, Context context){
 		StringBuilder sb=new StringBuilder();
 		sb.append("{");
 		sb.append("\"type\":\""+dataset.getType()+"\",");
 		sb.append("\"data\":"+dataset.buildDataJson(context, cell)+",");
 		sb.append("\"options\":{");
+		boolean withoption=false;
 		if(options!=null && options.size()>0){
-			for(Option option:options){
-				sb.append(option.buildOptionJson());					
-				sb.append(",");
+			for(int i=0;i<options.size();i++){
+				Option option=options.get(i);
+				if(i>0){
+					sb.append(",");
+				}
+				sb.append(option.buildOptionJson());
+				withoption=true;
 			}
 		}
+		if(plugins!=null && plugins.size()>0) {
+			if(withoption){				
+				sb.append(",");
+			}
+			withoption=true;
+			sb.append("\"plugins\": {");
+			for(Plugin plugin:plugins) {
+				String pluginJson=plugin.toJson(dataset.getType());
+				if(pluginJson!=null) {
+					sb.append(pluginJson);
+				}
+			}
+			sb.append("}");
+		}else {
+			withoption=true;
+			sb.append("\"plugins\": {");
+			sb.append("\"datalabels\":{\"display\":false}");
+			sb.append("}");
+		}
 		if(xaxes!=null || yaxes!=null){
+			if(withoption){
+				sb.append(",");
+			}
+			withoption=true;
 			sb.append("\"scales\":{");
 			if(xaxes!=null){
 				sb.append("\"xAxes\":[");
@@ -72,13 +102,14 @@ public class Chart {
 			}
 			sb.append("}");
 		}else{
-			if(hasYAxes(dataset)){
-				sb.append("\"scales\":{\"yAxes\":[{\"ticks\":{\"min\":0}}]}");				
+			if(withoption && hasYAxes(dataset)){
+				sb.append(",");
+				sb.append("\"scales\":{\"yAxes\":[]}");				
 			}
 		}
 		sb.append("}");
 		sb.append("}");
-		ChartData chartData=new ChartData(sb.toString());
+		ChartData chartData=new ChartData(sb.toString(),cell);
 		context.addChartData(chartData);
 		return chartData;
 	}
@@ -105,6 +136,14 @@ public class Chart {
 
 	public void setOptions(List<Option> options) {
 		this.options = options;
+	}
+
+	public List<Plugin> getPlugins() {
+		return plugins;
+	}
+
+	public void setPlugins(List<Plugin> plugins) {
+		this.plugins = plugins;
 	}
 
 	public Dataset getDataset() {

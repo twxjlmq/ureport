@@ -17,20 +17,26 @@ package com.bstek.ureport.build.assertor;
 
 import java.math.BigDecimal;
 
+import org.apache.commons.lang.StringUtils;
+
 import com.bstek.ureport.Utils;
 
 /**
  * @author Jacky.gao
  * @since 2017年1月12日
  */
-public class LessThenAssertor implements Assertor {
+public class LessThenAssertor extends AbstractAssertor{
 
 	@Override
 	public boolean eval(Object left, Object right) {
 		if(left==null || right==null){
 			return false;
 		}
+		if(StringUtils.isBlank(left.toString()) || StringUtils.isBlank(right.toString())){
+			return false;
+		}
 		BigDecimal leftObj=Utils.toBigDecimal(left);
+		right=buildObject(right);
 		BigDecimal rightObj=Utils.toBigDecimal(right);
 		return leftObj.compareTo(rightObj)==-1;
 	}

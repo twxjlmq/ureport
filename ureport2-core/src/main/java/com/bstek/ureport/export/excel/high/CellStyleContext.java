@@ -42,7 +42,7 @@ public class CellStyleContext {
 	private Map<String,XSSFCellStyle> styleMap=new HashMap<String,XSSFCellStyle>();
 	public XSSFCellStyle produceXSSFCellStyle(SXSSFWorkbook wb,Cell cell){
 		String name=cell.getName();
-		if(cell.getCustomCellStyle()==null){
+		if(cell.getCustomCellStyle()==null && cell.getRow().getCustomCellStyle()==null){
 			if(styleMap.containsKey(name)){
 				return styleMap.get(name);
 			}else{
@@ -162,7 +162,17 @@ public class CellStyleContext {
 			}
 		}
 		XSSFFont font=(XSSFFont)wb.createFont();
-		font.setFontHeight(cellStyle.getFontSize());
+		int fontSize=cellStyle.getFontSize();
+		if(customStyle!=null && customStyle.getFontSize()>0){
+			fontSize=customStyle.getFontSize();
+		}
+		if(rowStyle!=null && rowStyle.getFontSize()>0){
+			fontSize=rowStyle.getFontSize();
+		}
+		if(colStyle!=null && colStyle.getFontSize()>0){
+			fontSize=colStyle.getFontSize();
+		}
+		font.setFontHeight(fontSize);
 		Boolean bold=cellStyle.getBold();
 		if(customStyle!=null && customStyle.getBold()!=null){
 			bold=customStyle.getBold();
@@ -256,7 +266,7 @@ public class CellStyleContext {
 		CellStyle rowStyle=cell.getRow().getCustomCellStyle();
 		CellStyle colStyle=cell.getColumn().getCustomCellStyle();
 		StringBuffer sb=new StringBuffer();
-		String bgcolor=customStyle.getBgcolor();
+		String bgcolor=customStyle!=null ? customStyle.getBgcolor() : null;
 		if(rowStyle!=null && StringUtils.isNotBlank(rowStyle.getBgcolor())){
 			bgcolor=rowStyle.getBgcolor();
 		}
@@ -266,23 +276,23 @@ public class CellStyleContext {
 		if(StringUtils.isNotEmpty(bgcolor)){
 			sb.append("bgcolor:"+bgcolor);
 		}
-		Border topBorder=customStyle.getTopBorder();
+		Border topBorder=customStyle!=null ? customStyle.getTopBorder() : null;
 		if(topBorder!=null){
 			sb.append("topborder:"+buildBorderStyleId(topBorder));
 		}
-		Border bottomBorder=customStyle.getBottomBorder();
+		Border bottomBorder=customStyle!=null ? customStyle.getBottomBorder() : null;
 		if(bottomBorder!=null){
 			sb.append("bottomborder:"+buildBorderStyleId(bottomBorder));
 		}
-		Border leftBorder=customStyle.getLeftBorder();
+		Border leftBorder=customStyle!=null ? customStyle.getLeftBorder() : null;
 		if(leftBorder!=null){
 			sb.append("leftborder:"+buildBorderStyleId(leftBorder));  				
 		}
-		Border rightBorder=customStyle.getRightBorder();
+		Border rightBorder=customStyle!=null ? customStyle.getRightBorder() : null;
 		if(rightBorder!=null){
 			sb.append("rightborder:"+buildBorderStyleId(rightBorder));
 		}
-		Alignment align=customStyle.getAlign();
+		Alignment align=customStyle!=null ? customStyle.getAlign() : null;
 		if(rowStyle!=null && rowStyle.getAlign()!=null){
 			align=rowStyle.getAlign();
 		}
@@ -298,7 +308,7 @@ public class CellStyleContext {
 				sb.append("align:"+HorizontalAlignment.RIGHT.name());
 			}
 		}
-		Alignment valign=customStyle.getValign();
+		Alignment valign=customStyle!=null ? customStyle.getValign() : null;
 		if(rowStyle!=null && rowStyle.getValign()!=null){
 			valign=rowStyle.getValign();
 		}
@@ -314,7 +324,7 @@ public class CellStyleContext {
 				sb.append("valign:"+VerticalAlignment.BOTTOM.name());
 			}
 		}
-		Boolean underline=customStyle.getUnderline();
+		Boolean underline=customStyle!=null ? customStyle.getUnderline() : null;
 		if(rowStyle!=null && rowStyle.getUnderline()!=null){
 			underline=rowStyle.getUnderline();
 		}
@@ -322,7 +332,7 @@ public class CellStyleContext {
 			underline=colStyle.getUnderline();
 		}
 		sb.append("underline:"+underline);
-		Boolean bold=customStyle.getBold();
+		Boolean bold=customStyle!=null ? customStyle.getBold() : null;
 		if(rowStyle!=null && rowStyle.getBold()!=null){
 			bold=rowStyle.getBold();
 		}
@@ -330,7 +340,7 @@ public class CellStyleContext {
 			bold=colStyle.getBold();
 		}
 		sb.append("bold:"+bold);
-		Boolean italic=customStyle.getItalic();
+		Boolean italic=customStyle!=null ? customStyle.getItalic() : null;
 		if(rowStyle!=null && rowStyle.getItalic()!=null){
 			italic=rowStyle.getItalic();
 		}
@@ -338,7 +348,7 @@ public class CellStyleContext {
 			italic=colStyle.getItalic();
 		}
 		sb.append("italic:"+italic);	
-		String forecolor=customStyle.getForecolor();
+		String forecolor=customStyle!=null ? customStyle.getForecolor() : null;
 		if(rowStyle!=null && rowStyle.getForecolor()!=null){
 			forecolor=rowStyle.getForecolor();
 		}
@@ -346,7 +356,7 @@ public class CellStyleContext {
 			forecolor=colStyle.getForecolor();
 		}
 		sb.append("forecolor:"+forecolor);
-		String font=customStyle.getFontFamily();
+		String font=customStyle!=null ? customStyle.getFontFamily() : null;
 		if(rowStyle!=null && rowStyle.getFontFamily()!=null){
 			font=rowStyle.getFontFamily();
 		}
@@ -354,7 +364,7 @@ public class CellStyleContext {
 			font=colStyle.getFontFamily();
 		}
 		sb.append("font:"+font);
-		int fontSize=customStyle.getFontSize();
+		int fontSize=customStyle!=null ? customStyle.getFontSize() : 0;
 		if(rowStyle!=null && rowStyle.getFontSize()>0){
 			fontSize=rowStyle.getFontSize();
 		}

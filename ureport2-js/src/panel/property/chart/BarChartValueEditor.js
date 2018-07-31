@@ -16,11 +16,11 @@ export default class BarChartValueEditor extends CategoryChartValueEditor{
         parentContainer.append(this.container);
         const tabUL=$(`<ul class="nav nav-tabs"></ul>`);
         this.container.append(tabUL);
-        const dsLI=$(`<li class="active"><a href="#chart_bind_dataset_${this.id}" data-toggle="tab">数据集绑定</a></li>`);
+        const dsLI=$(`<li class="active"><a href="#chart_bind_dataset_${this.id}" data-toggle="tab">${window.i18n.chart.datasetBind}</a></li>`);
         tabUL.append(dsLI);
-        const optionLI=$(`<li><a href="#chart_option_${this.id}" data-toggle="tab">选项</a></li>`);
+        const optionLI=$(`<li><a href="#chart_option_${this.id}" data-toggle="tab">${window.i18n.chart.option}</a></li>`);
         tabUL.append(optionLI);
-        this.axisLI=$(`<li><a href="#chart_axis_${this.id}" data-toggle="tab">轴配置</a></li>`);
+        this.axisLI=$(`<li><a href="#chart_axis_${this.id}" data-toggle="tab">${window.i18n.chart.axisConfig}</a></li>`);
         tabUL.append(this.axisLI);
         const tabContent=$(`<div class="tab-content"></div>`);
         this.container.append(tabContent);
@@ -46,6 +46,7 @@ export default class BarChartValueEditor extends CategoryChartValueEditor{
         optionContent.append(group);
         this.initTitleOption(group);
         this.initLegendOption(group);
+        this.initDataLabelsOption(group);
         this.initAnimationsOption(group);
     }
     _initAxisTab(axisContent){
@@ -75,10 +76,12 @@ export default class BarChartValueEditor extends CategoryChartValueEditor{
         this.seriesTextEditor.val(dataset.seriesText);
         this.valuePropertySelect.val(dataset.valueProperty);
         this.aggregateSelect.val(dataset.collectType);
-        if(dataset.seriesType==='text'){
+        if(dataset.seriesType==='property'){
             this.propertySeriesRadio.children('input').attr('checked',true);
+            this.propertySeriesRadio.children('input').trigger('click');
         }else{
             this.textSeriesRadio.children('input').attr('checked',true);
+            this.textSeriesRadio.children('input').trigger('click');
         }
         this.formatEditor.val(dataset.format);
 
@@ -101,7 +104,13 @@ export default class BarChartValueEditor extends CategoryChartValueEditor{
         }else{
             this.hideYTitleRadio.trigger('click');
         }
-
+        this.hideDataLabelsRadio.children('input').attr('checked',true);
+        const plugins=chart.plugins || [];
+        for(let plugin of plugins){
+            if(plugin.name==='data-labels' && plugin.display){
+                this.showDataLabelsRadio.children('input').attr('checked',true);
+            }
+        }
         const options=chart.options || [];
         for(let option of options){
             switch (option.type){

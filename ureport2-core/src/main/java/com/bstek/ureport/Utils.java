@@ -46,6 +46,18 @@ public class Utils implements ApplicationContextAware{
 	private static ApplicationContext applicationContext;
 	private static Collection<BuildinDatasource> buildinDatasources;
 	private static Collection<ImageProvider> imageProviders;
+	private static boolean debug;
+	
+	public static boolean isDebug() {
+		return Utils.debug;
+	}
+	
+	public static void logToConsole(String msg){
+		if(Utils.debug){
+			System.out.println(msg);
+		}
+	}
+	
 	public static ApplicationContext getApplicationContext() {
 		return applicationContext;
 	}
@@ -57,6 +69,7 @@ public class Utils implements ApplicationContextAware{
 	public static Collection<ImageProvider> getImageProviders() {
 		return imageProviders;
 	}
+
 	
 	public static Connection getBuildinConnection(String name){
 		for(BuildinDatasource datasource:buildinDatasources){
@@ -146,8 +159,9 @@ public class Utils implements ApplicationContextAware{
 	}
 	
 	public static Object getProperty(Object obj,String property){
+		if(obj==null)return null;
 		try{
-			if(obj instanceof Map){
+			if(obj instanceof Map && property.indexOf(".")==-1){
 				Map<?,?> map=(Map<?,?>)obj;
 				return map.get(property);
 			}
@@ -198,10 +212,16 @@ public class Utils implements ApplicationContextAware{
 		throw new ConvertException("Can not convert "+obj+" to BigDecimal.");
 	}
 	
+	public void setDebug(boolean debug) {
+		Utils.debug = debug;
+	}
+	
 	@Override
 	public void setApplicationContext(ApplicationContext applicationContext)throws BeansException {
 		Utils.applicationContext=applicationContext;
-		buildinDatasources=applicationContext.getBeansOfType(BuildinDatasource.class).values();
-		imageProviders=applicationContext.getBeansOfType(ImageProvider.class).values();
+		buildinDatasources=new ArrayList<BuildinDatasource>();
+		buildinDatasources.addAll(applicationContext.getBeansOfType(BuildinDatasource.class).values());
+		imageProviders=new ArrayList<ImageProvider>();
+		imageProviders.addAll(applicationContext.getBeansOfType(ImageProvider.class).values());
 	}
 }
